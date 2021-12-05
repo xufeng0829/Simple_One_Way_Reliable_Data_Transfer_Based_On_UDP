@@ -63,6 +63,17 @@ def main():
 
 
 def add_header(segment, dest_port, seqn, window, ack=0, fin=0):
+    '''
+    This is the function to add header to data segments.
+    return a TCP datagram with correct header.
+    '''
+
+    def bitadd(a:int, b:int):
+        c = a + b
+        if c.bit_length() > 16:
+            c = c - 2 ** 16 + 1
+        return c
+
     source_port = CLIENT_SOURCE_PORT
     ackn = unsigned_int.pack(seqn + MSS - HEADER_SIZE)
     winsize = unsigned_short.pack(window)
@@ -75,7 +86,27 @@ def add_header(segment, dest_port, seqn, window, ack=0, fin=0):
     elif ack==1 and fin==1:
         flags = unsigned_short.pack(int('0101000000100001', 2))
     urgent = unsigned_short.pack(0)
+    '''
+    calculate check sum.
+    '''
+    sum = 0
+    sum = bitadd(sum, unsigned_short.unpack(source_port)[0])
+    sum = bitadd(sum, unsigned_short.unpack(dest_port)[0])
+    sum = bitadd(sum, seqn)
+    sum = bitadd(sum, unsigned_short.unpack(ackn[0:2])[0])
+    sum = bitadd(sum, unsigned_short.unpack(ackn[2:4])[0])
+    sum = bitadd(sum, unsigned_short.unpack(flags)[0])
+    sum = bitadd(sum, window)
+    i = 0
+    while i < len(segment):
+        if i + 2 <= len(segment):
+            byte_2 = segment[i:i+2]
+        else:
+            byte_2 = segment[i:i+1]
     checksum = unsigned_short.pack(0)
+    '''
+    checksum calculation done.
+    '''
     segment =   source_port + dest_port\
               + unsigned_int.pack(seqn) \
               + ackn \
@@ -86,9 +117,5 @@ def add_header(segment, dest_port, seqn, window, ack=0, fin=0):
 
 
 if __name__ == '__main__':
-    a = unsigned_short.pack(20480)
-    b = unsigned_short.pack(0)
-    c = unsigned_short.pack(int('0101000000000000', 2))
-    print(bin(a[0]), bin(a[1]))
-    print(a)
-    print(unsigned_short.unpack(c))
+    b = make_pkt_buffer(['', 'test.txt'])
+    print(len(b[0]))
