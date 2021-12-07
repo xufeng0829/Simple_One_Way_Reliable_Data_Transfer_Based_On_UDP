@@ -62,6 +62,9 @@ def main():
     timer_start = 0
     timeout_value = 2  # default timeout is 2 seconds
     window_size = int(args[4])
+    if window_size < MSS - HEADER_SIZE:
+        print('window size should larger than 1000.')
+        return
     send_base = 0
     next_seq_num = 0
 
