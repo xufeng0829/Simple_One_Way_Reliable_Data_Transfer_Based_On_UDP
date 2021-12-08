@@ -17,14 +17,15 @@ def bitadd(a: int, b: int):
     return c
 
 
-def make_pkt(msg, source_port: int, dest_port: int, seqn: int, window: int, ack=0, fin=0):
+def make_pkt(msg: bytes, source_port: int, dest_port: int, seqn: int, ackn: int, window: int, ack=0, fin=0):
     '''
         This is the function to add header to a piece of message.
         return a TCP datagram with correct header.
     '''
-    ackn = unsigned_int.pack(seqn + len(msg))
+
+    ackn = unsigned_int.pack(ackn)
     window_size = unsigned_short.pack(window)
-    if ack == 0 and fin == 0:  # 20bytes head, so the head length should be 5.
+    if ack == 0 and fin == 0:  # 20 bytes head, so the head length should be 5.
         flags = unsigned_short.pack(int('0101000000000000', 2))
     elif ack == 1 and fin == 0:
         flags = unsigned_short.pack(int('0101000000100000', 2))
@@ -32,6 +33,7 @@ def make_pkt(msg, source_port: int, dest_port: int, seqn: int, window: int, ack=
         flags = unsigned_short.pack(int('0101000000000001', 2))
     elif ack == 1 and fin == 1:
         flags = unsigned_short.pack(int('0101000000100001', 2))
+    # print(len(bin(unsigned_short.unpack(flags)[0])))
     urgent = unsigned_short.pack(0)
     '''
     calculate check sum.
@@ -87,7 +89,7 @@ def uncorrupted(segment):
         i = i + 2
     # reverse 0 1 in sum.
     # print('sum: ' + str(sum))
-    print(sum)
+    # print(sum)
     if sum == 2 ** 16 - 1:
         return True
     return False

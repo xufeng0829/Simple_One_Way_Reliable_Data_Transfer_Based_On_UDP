@@ -21,7 +21,8 @@ CLIENT_SOURCE_PORT = unsigned_short.pack(12000)  # set client source port as 120
 
 def main():
     print('TCP client running...')
-    args = input().split(" ")
+    args = input('tcpclient <file> <address of udpl> <port number of udpl> <window size> <ack port number>\n').split(
+        " ")
     if len(args) != 6:
         print('illegal input! input should look like: \n '
               'tcpclient <file> <address of udpl> <port number of udpl> <window size> <ack port number>')
@@ -43,65 +44,106 @@ def main():
     """
     clientSocket = socket.socket(AF_INET, SOCK_DGRAM)
     source_port = 12000  # this is set as default and cannot change, should be mentioned in readme file.
-    clientSocket.bind('', source_port)
-    port_udpl = unsigned_short.pack(int(args[3]))
+    clientSocket.bind(('', source_port))
+    port_udpl = int(args[3])
     address_udpl = args[2]
+
     """
     Settings of acks listening socket
     """
     ack_port_number = int(args[5])
     ACKSocket = socket.socket(AF_INET, SOCK_DGRAM)
     ACKSocket.setblocking(False)
-    ACKSocket.bind('', ack_port_number)
-    print(args)
+    ACKSocket.bind(('', ack_port_number))
+    # print(args)
 
     """
     Some status parameters initialization
     """
     timer_status = False  # timer status set false at first. false means timer is off, true means timer is on.
     timer_start = 0
-    timeout_value = 2  # default timeout is 2 seconds
+    timeout_interval = 1  # default timeout is 1 second
     window_size = int(args[4])
     if window_size < MSS - HEADER_SIZE:
         print('window size should larger than 1000.')
         return
     send_base = 0
     next_seq_num = 0
+    fin = '0'
 
-    while True:
+    """
+    RTT measurement parameters
+    """
+    RTT_measure = False  # this is the status to check if the timer is valid for RTT measurement.
+    RTT_number = 0  # this is the number of corresponding ack to measure RTT
+    estimate_RTT = 1
+    dev_RTT = 0
+
+    print('start sending %s to %s:%s, window size = %s bytes' %(args[1], args[2], args[3], args[4]))
+
+    while fin == '0':
         if next_seq_num - send_base < window_size:  # if there is still space in the sliding window
             if next_seq_num < file_size:  # if the file is not finished reading
+                file_to_send.seek(next_seq_num)  # seek the correct position to read file.
                 msg = bytes(file_to_send.read(MSS - HEADER_SIZE))
                 if next_seq_num + MSS - HEADER_SIZE >= file_size:  # if this is the last message to read
-                    pkt = TCPpacket.make_pkt(msg, source_port, port_udpl, next_seq_num, window_size, fin=1)
+                    pkt = TCPpacket.make_pkt(msg, source_port, port_udpl, next_seq_num, 0, window_size, fin=1)
+                    print('final packet, ', end='')
                 else:
-                    pkt = TCPpacket.make_pkt(msg, source_port, port_udpl, next_seq_num, window_size)
-                next_seq_num += len(pkt - HEADER_SIZE)
+                    pkt = TCPpacket.make_pkt(msg, source_port, port_udpl, next_seq_num, 0, window_size)
+                print('sending ' + str(next_seq_num) + ' byte...')
+                next_seq_num += len(pkt) - HEADER_SIZE
                 clientSocket.sendto(pkt, (address_udpl, port_udpl))
                 if timer_status == False:
                     timer_start = time.time()
                     timer_status = True
+                    if not RTT_measure:  # if there is no measure of RTT, a measurement is needed.
+                        RTT_measure = True
+                        RTT_number = next_seq_num
             else:
                 pass
 
-        if time.time() - timer_start >= timeout_value:
+        if time.time() - timer_start >= timeout_interval and timer_status == True:
             file_to_send.seek(send_base)  # return to the place with smallest seq number, which is the base of window.
+            msg = bytes(file_to_send.read(MSS - HEADER_SIZE))  # retransmit the smallest seqn packet.
+            if send_base + MSS - HEADER_SIZE >= file_size:  # if this is the last message to read
+                pkt = TCPpacket.make_pkt(msg, source_port, port_udpl, send_base, 0, window_size, fin=1)
+            else:
+                pkt = TCPpacket.make_pkt(msg, source_port, port_udpl, send_base, 0, window_size)
+            clientSocket.sendto(pkt, (address_udpl, port_udpl))
+            print('timeout, ' + 'retransmitting ' + str(send_base) + ' byte...')
+            timeout_interval = timeout_interval * 2
             timer_start = time.time()  # reset the timer.
+            RTT_measure = False  # never measure RTT with a retransmission
 
         try:
             rcv_pkt = ACKSocket.recv(2048)
-            ack_number_from_rcvr = unsigned_int.unpack(rcv_pkt[8:12])[0]
-            if ack_number_from_rcvr > send_base:  # this means some acks are lost, and move the window towards.
-                send_base = ack_number_from_rcvr
-                if send_base < next_seq_num:
-                    timer_start = time.time()
         except BlockingIOError as e:
             pass
+        else:
+            ack_number_from_rcvr = unsigned_int.unpack(rcv_pkt[8:12])[0]
+            fin = bin(unsigned_short.unpack(rcv_pkt[12:14])[0])[16]
+            # print(fin)
+            # print(ack_number_from_rcvr)
+            if ack_number_from_rcvr > send_base:  # this means packets are received, and move the window towards.
+                send_base = ack_number_from_rcvr
+                if ack_number_from_rcvr == RTT_number and RTT_measure:
+                    # calculate the timeout interval
+                    sample_RTT = time.time() - timer_start
+                    estimate_RTT = 0.875 * estimate_RTT + 0.125 * sample_RTT
+                    dev_RTT = 0.75 * dev_RTT + 0.25 * abs(sample_RTT - estimate_RTT)
+                    timeout_interval = estimate_RTT + 4 * dev_RTT
+                    RTT_measure = False  # set RTT_measure to false.
+                if send_base < next_seq_num:  # if current window still has unacked packets
+                    timer_start = time.time()
+                    RTT_measure = False
+                else:  # move to next window, stop the timer.
+                    # Timer will be restart after the first packet of next window is sent.
+                    timer_status = False
+
+    print('file transmission success.')
+    file_to_send.close()
 
 
 if __name__ == '__main__':
-    # main()
-    i = 12345
-    i1 = unsigned_int.pack(i)
-    print(unsigned_int.unpack(i1))
-
+    main()
