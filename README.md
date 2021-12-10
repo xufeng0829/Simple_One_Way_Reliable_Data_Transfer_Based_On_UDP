@@ -16,7 +16,7 @@ Feng Xu (fx2174)
 
 - **`Receiver.py`**
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Receiver is a the server in this project. It can receive data from sender, decode the packet and write data in to the file with a path given by user. Plus, receiver can check if packet is corrupted, out of order or redundant. Receiver also has a buffer window to store out-of-order packet. Receiver can send proper ack to the sender, and close automatically when transmission is complete. However, Receiver can not shut down itself when connection is lost.
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Receiver is the server in this project. It can receive data from sender, decode the packet and write data in to the file with a path given by user. Plus, receiver can check if packet is corrupted, out of order or redundant. Receiver also has a buffer window to store out-of-order packet. Receiver can send proper ack to the sender, and close automatically when transmission is complete. However, Receiver can not shut down itself when connection is lost.
 
 
 
