@@ -91,10 +91,11 @@ def main():
                 msg = bytes(file_to_send.read(MSS - HEADER_SIZE))
                 if next_seq_num + MSS - HEADER_SIZE >= file_size:  # if this is the last message to read
                     pkt = TCPpacket.make_pkt(msg, source_port, port_udpl, next_seq_num, 0, window_size, fin=1)
-                    print('final packet, ', end='')
+                    print('SENDING ' + str(next_seq_num) + ' byte...', end='')
+                    print('(FINAL PACKET)')
                 else:
                     pkt = TCPpacket.make_pkt(msg, source_port, port_udpl, next_seq_num, 0, window_size)
-                print('sending ' + str(next_seq_num) + ' byte...')
+                    print('SENDING ' + str(next_seq_num) + ' byte...')
                 next_seq_num += len(pkt) - HEADER_SIZE
                 clientSocket.sendto(pkt, (address_udpl, port_udpl))
                 if timer_status == False:
@@ -108,6 +109,11 @@ def main():
                 pass
 
         if time.time() - timer_start >= timeout_interval and timer_status == True:
+            if timeout_interval > 5:
+                print('-'*50)
+                print('timeout interval is more than 5 seconds, highly possible that the connection is off.')
+                print('file transmission failed.')
+                return
             next_seq_num = send_base
             file_to_send.seek(send_base)  # return to the place with smallest seq number, which is the base of window.
             msg = bytes(file_to_send.read(MSS - HEADER_SIZE))  # retransmit the smallest seqn packet.
@@ -116,9 +122,9 @@ def main():
             else:
                 pkt = TCPpacket.make_pkt(msg, source_port, port_udpl, send_base, 0, window_size)
             clientSocket.sendto(pkt, (address_udpl, port_udpl))
-            print('timeout, ' + 'retransmitting ' + str(send_base) + ' byte...')
+            print('TIMEOUT ' + 'retransmitting ' + str(send_base) + ' byte...')
             timeout_interval = timeout_interval * 2
-            print('timeout interval is %fms' % (timeout_interval * 1000))
+            print('TIMEOUT INTERVAL: %fms' % (timeout_interval * 1000))
             timer_start = time.time()  # reset the timer.
             RTT_measure = False  # never measure RTT with a retransmission
 
@@ -145,7 +151,7 @@ def main():
                     dev_RTT = 0.75 * dev_RTT + 0.25 * abs(sample_RTT - estimate_RTT)
                     # print('Dev RTT is %f' % dev_RTT)
                     timeout_interval = estimate_RTT + 4 * dev_RTT
-                    print('timeout interval is %fms' % (timeout_interval * 1000))
+                    print('TIMEOUT INTERVAL: %fms' % (timeout_interval * 1000))
                     RTT_measure = False  # set RTT_measure to false.
                 if send_base < next_seq_num:  # if current window still has unacked packets
                     timer_start = time.time()
@@ -155,7 +161,7 @@ def main():
                     timer_status = False
                     RTT_measure = False
         # print('timeout interval %f' % timeout_interval)
-
+    print('-' * 50)
     print('file transmission complete.')
     file_to_send.close()
 
