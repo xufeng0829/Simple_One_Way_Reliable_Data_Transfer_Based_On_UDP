@@ -48,13 +48,15 @@ def main():
     ACKSocket.bind(('', source_port))  # the ack sending socket port is hardcode as 16000
 
     print('receiving file from %s, write into %s.' %(args[3], args[1]))
+    print('-'*50)
 
     expect_ack = 0
     while True:
         segment = receiver_socket.recv(2048)
+        window_size = unsigned_short.unpack(segment[14:16])[0]
         if TCPpacket.uncorrupted(segment):
             if unsigned_int.unpack(segment[4:8])[0] == expect_ack:  # sequence number is equal to the expect ack.
-                print('received %s packet correctly.' % expect_ack)
+                print('RECEIVED: %s packet correctly.' % expect_ack)
                 # update cumulative ack, and send ack packet
                 expect_ack = expect_ack + len(segment) - HEADER_SIZE
                 window_size = unsigned_short.unpack(segment[14:16])[0]
@@ -63,7 +65,7 @@ def main():
                 if bin(fin)[16] == '1':  # bin() returns a '0b' at first.
                     ack_pkt = TCPpacket.make_pkt(b'', source_port, port_for_acks, 1, expect_ack, window_size, ack=1, fin=1)
                     ACKSocket.sendto(ack_pkt, (address_for_acks, port_for_acks))
-                    print('final packet')
+                    print('RECEIVED: final packet')
                     file_to_receive.close()
                     break
                 else:
@@ -71,14 +73,16 @@ def main():
                     ACKSocket.sendto(ack_pkt, (address_for_acks, port_for_acks))
 
             elif unsigned_int.unpack(segment[4:8])[0] < expect_ack:  # some former pkt is received
+                print('REDUNDANT: %s packet' % str(unsigned_int.unpack(segment[4:8])[0]))
                 ack_pkt = TCPpacket.make_pkt(b'', source_port, port_for_acks, 1, expect_ack, window_size, ack=1)
                 ACKSocket.sendto(ack_pkt, (address_for_acks, port_for_acks))
 
             else:
+                print('OUT OF ORDER: %s packet' % str(unsigned_int.unpack(segment[4:8])[0]))
                 ack_pkt = TCPpacket.make_pkt(b'', source_port, port_for_acks, 1, expect_ack, window_size, ack=1)
                 ACKSocket.sendto(ack_pkt, (address_for_acks, port_for_acks))
         else:  # the pkt is corrupted.
-            # TODO: send ack packet
+            print('CORRUPTED: %s packet' % str(expect_ack))
             ack_pkt = TCPpacket.make_pkt(b'', source_port, port_for_acks, 1, expect_ack, window_size, ack=1)
             ACKSocket.sendto(ack_pkt, (address_for_acks, port_for_acks))
 

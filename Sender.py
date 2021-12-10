@@ -78,8 +78,11 @@ def main():
     RTT_number = 0  # this is the number of corresponding ack to measure RTT
     estimate_RTT = 1
     dev_RTT = 0
+    RTT_timer = time.time()  # timer for measuring sample RTT. Only one normally sending packet is measured while
+                             # sending. Never measuring retransmitted packet.
 
     print('start sending %s to %s:%s, window size = %s bytes' %(args[1], args[2], args[3], args[4]))
+    print('-'*50)
 
     while fin == '0':
         if next_seq_num - send_base < window_size:  # if there is still space in the sliding window
@@ -97,13 +100,15 @@ def main():
                 if timer_status == False:
                     timer_start = time.time()
                     timer_status = True
-                    if not RTT_measure:  # if there is no measure of RTT, a measurement is needed.
-                        RTT_measure = True
-                        RTT_number = next_seq_num
+                if not RTT_measure:  # if there is no measure of RTT, a measurement is needed.
+                    RTT_measure = True
+                    RTT_number = next_seq_num
+                    RTT_timer = time.time()
             else:
                 pass
 
         if time.time() - timer_start >= timeout_interval and timer_status == True:
+            next_seq_num = send_base
             file_to_send.seek(send_base)  # return to the place with smallest seq number, which is the base of window.
             msg = bytes(file_to_send.read(MSS - HEADER_SIZE))  # retransmit the smallest seqn packet.
             if send_base + MSS - HEADER_SIZE >= file_size:  # if this is the last message to read
@@ -113,6 +118,7 @@ def main():
             clientSocket.sendto(pkt, (address_udpl, port_udpl))
             print('timeout, ' + 'retransmitting ' + str(send_base) + ' byte...')
             timeout_interval = timeout_interval * 2
+            print('timeout interval is %fms' % (timeout_interval * 1000))
             timer_start = time.time()  # reset the timer.
             RTT_measure = False  # never measure RTT with a retransmission
 
@@ -129,10 +135,17 @@ def main():
                 send_base = ack_number_from_rcvr
                 if ack_number_from_rcvr == RTT_number and RTT_measure:
                     # calculate the timeout interval
-                    sample_RTT = time.time() - timer_start
-                    estimate_RTT = 0.875 * estimate_RTT + 0.125 * sample_RTT
+                    sample_RTT = time.time() - RTT_timer
+                    # print('sample RTT is %f with %d packet.' %(sample_RTT, RTT_number))
+                    if estimate_RTT == 1:
+                        estimate_RTT = sample_RTT
+                    else:
+                        estimate_RTT = 0.875 * estimate_RTT + 0.125 * sample_RTT
+                    # print('estimate RTT is %f' % estimate_RTT)
                     dev_RTT = 0.75 * dev_RTT + 0.25 * abs(sample_RTT - estimate_RTT)
+                    # print('Dev RTT is %f' % dev_RTT)
                     timeout_interval = estimate_RTT + 4 * dev_RTT
+                    print('timeout interval is %fms' % (timeout_interval * 1000))
                     RTT_measure = False  # set RTT_measure to false.
                 if send_base < next_seq_num:  # if current window still has unacked packets
                     timer_start = time.time()
@@ -140,8 +153,10 @@ def main():
                 else:  # move to next window, stop the timer.
                     # Timer will be restart after the first packet of next window is sent.
                     timer_status = False
+                    RTT_measure = False
+        # print('timeout interval %f' % timeout_interval)
 
-    print('file transmission success.')
+    print('file transmission complete.')
     file_to_send.close()
 
 
