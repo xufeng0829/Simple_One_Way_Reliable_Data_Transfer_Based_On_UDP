@@ -18,6 +18,18 @@ Feng Xu (fx2174)
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Receiver is the server in this project. It can receive data from sender, decode the packet and write data in to the file with a path given by user. Plus, receiver can check if packet is corrupted, out of order or redundant. Receiver also has a buffer window to store out-of-order packet. Receiver can send proper ack to the sender, and close automatically when transmission is complete. However, Receiver can not shut down itself when connection is lost.
 
+- **`Interatction.pdf`**
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This file shows the interactions between sender and receiver, i.e. screenshots of input and output of programs and statistics of udp emulator.
+
+- **`Program_Listing.txt`**
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this file lists the name of programs and short description of them.
+
+- **`Overall Description.pdf`**
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this file briefly describes the overall program design, and some explanations of how it works and tradeoff made.
+
 
 
 ## Commands Needed for Running 
