@@ -56,7 +56,7 @@ tcpserver receive.txt 14000 localhost 15000
 
 **Here are some features needed to know before running the programs, otherwise may cause bugs.**
 &emsp;
-***Test enviroment: python 3.5, Ubuntu 16.04.7 LTS***
+***(Test enviroment: python 3.5, Ubuntu 16.04.7 LTS)***
 > Port number of sender's socket for sending data is binded with 12000
 
 > Port number of receiver's socket for sending ack is binded with 16000
