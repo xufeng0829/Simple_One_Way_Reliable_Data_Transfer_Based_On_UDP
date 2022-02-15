@@ -1,7 +1,6 @@
-# CSEE4119 Program Assignment 2
-# A Simplex TCP 
+# A Simple One-way Reliable Data Transfer Based on UDP 
 &emsp;
-Feng Xu (fx2174)
+Feng Xu
 12/10/2021
 &emsp;
 ## Files and Descriptions
